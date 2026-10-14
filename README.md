@@ -14,8 +14,8 @@ cd DownloadnfeSefaz
 .\dist\XmlA1.exe
 ~~~
 
-Requer Windows com **.NET Framework 4.8**. Não depende do Domínio, SQL Anywhere,
-Excel ou NuGet. O executável não possui expiração própria. O certificado e as
+Requer Windows com **.NET Framework 4.8**. Não depende de Excel ou NuGet.
+O executável não possui expiração própria. O certificado e as
 permissões dos serviços precisam estar válidos. O binário não possui assinatura
 de código do distribuidor.
 
@@ -147,9 +147,8 @@ O relatório fica em %USERPROFILE%\BuscaNFe-A1\testes.txt, fora do repositório.
 .\dist\XmlA1.exe --self-test  # Suíte sem certificado; test.ps1 executa a completa.
 ~~~
 
-O escopo é **NF-e modelo 55**. Não inclui CT-e, NFC-e ou NFS-e. Os fontes e o binário
-publicados são desta implementação. Não incluem o programa original do Domínio,
-suas DLLs ou fontes descompilados.
+O escopo é **NF-e modelo 55**. Não inclui CT-e, NFC-e ou NFS-e.
+O repositório contém os fontes, a documentação e o binário desta aplicação.
 
 ## Referências
 

@@ -1,7 +1,7 @@
 # Arquitetura e manutenção — XML A1 1.3.0
 
 Aplicação Windows Forms em C#, para .NET Framework 4.8. O projeto usa o compilador
-do Framework diretamente, sem NuGet, SQL Anywhere ou bibliotecas do Domínio.
+do Framework diretamente, sem NuGet ou bibliotecas externas.
 O executável inclui a interface, a lógica de consulta e os testes offline.
 
 ## Mapa dos fontes
