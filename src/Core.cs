@@ -185,8 +185,9 @@ namespace XmlA1 {
  }
  /// <summary>Fronteira de transporte substituída por respostas fictícias nos testes offline.</summary>
  public interface ISefaz {byte[] Distribute(string cnpj,int uf,int env,string nsu,string key,CancellationToken token);byte[] Science(string cnpj,int env,string key,CancellationToken token);}
- public sealed class SefazClient:ISefaz {
-  readonly X509Certificate2 cert;public Action<byte[]> ScienceRequest;public SefazClient(X509Certificate2 certificate){cert=certificate;}
+ public interface IConfirmationSefaz {byte[] Confirm(string cnpj,int env,string key,CancellationToken token);}
+ public sealed class SefazClient:ISefaz,IConfirmationSefaz {
+  readonly X509Certificate2 cert;public Action<byte[]> ScienceRequest,ConfirmationRequest;public SefazClient(X509Certificate2 certificate){cert=certificate;}
   public static byte[] DistributionEnvelope(string cnpj,int uf,int env,string nsu,string key) {
    XNamespace n=Rules.NfeNs,w="http://www.portalfiscal.inf.br/nfe/wsdl/NFeDistribuicaoDFe",s="http://www.w3.org/2003/05/soap-envelope";
    var request=new XElement(n+"distDFeInt",new XAttribute("versao","1.01"),new XElement(n+"tpAmb",env),new XElement(n+"cUFAutor",uf),new XElement(n+"CNPJ",Rules.Cnpj(cnpj)),key==null?new XElement(n+"distNSU",new XElement(n+"ultNSU",Rules.Nsu(nsu))):new XElement(n+"consChNFe",new XElement(n+"chNFe",key)));
@@ -194,8 +195,15 @@ namespace XmlA1 {
   }
   public byte[] Distribute(string cnpj,int uf,int env,string nsu,string key,CancellationToken token){if(key!=null&&!Rules.Key(key))throw new InvalidOperationException("Chave de NF-e inválida.");return Post(env==1?"https://www1.nfe.fazenda.gov.br/NFeDistribuicaoDFe/NFeDistribuicaoDFe.asmx":"https://hom1.nfe.fazenda.gov.br/NFeDistribuicaoDFe/NFeDistribuicaoDFe.asmx","http://www.portalfiscal.inf.br/nfe/wsdl/NFeDistribuicaoDFe/nfeDistDFeInteresse",DistributionEnvelope(cnpj,uf,env,nsu,key),token);}
   public static XmlDocument ScienceDocument(string cnpj,int env,string key,X509Certificate2 certificate) {
-   if(!Rules.Key(key))throw new InvalidOperationException("Chave de NF-e inválida.");XNamespace n=Rules.NfeNs;string id="ID210210"+key+"01";
-   var payload=new XDocument(new XElement(n+"envEvento",new XAttribute("versao","1.00"),new XElement(n+"idLote",DateTime.UtcNow.ToString("yyyyMMddHHmmss")),new XElement(n+"evento",new XAttribute("versao","1.00"),new XElement(n+"infEvento",new XAttribute("Id",id),new XElement(n+"cOrgao","91"),new XElement(n+"tpAmb",env),new XElement(n+"CNPJ",Rules.Cnpj(cnpj)),new XElement(n+"chNFe",key),new XElement(n+"dhEvento",DateTimeOffset.Now.ToString("yyyy-MM-ddTHH:mm:sszzz")),new XElement(n+"tpEvento","210210"),new XElement(n+"nSeqEvento","1"),new XElement(n+"verEvento","1.00"),new XElement(n+"detEvento",new XAttribute("versao","1.00"),new XElement(n+"descEvento","Ciencia da Operacao"))))));
+   return ManifestationDocument(cnpj,env,key,"210210",certificate);
+  }
+  public static XmlDocument ConfirmationDocument(string cnpj,int env,string key,X509Certificate2 certificate) {
+   return ManifestationDocument(cnpj,env,key,"210200",certificate);
+  }
+  static XmlDocument ManifestationDocument(string cnpj,int env,string key,string eventType,X509Certificate2 certificate) {
+   if(!Rules.Key(key))throw new InvalidOperationException("Chave de NF-e inválida.");if(eventType!="210210"&&eventType!="210200")throw new ArgumentException("Tipo de manifestação não implementado.");XNamespace n=Rules.NfeNs;string id="ID"+eventType+key+"01";
+   // Sequência 1: nunca altera automaticamente uma manifestação conclusiva anterior.
+   var payload=new XDocument(new XElement(n+"envEvento",new XAttribute("versao","1.00"),new XElement(n+"idLote",DateTime.UtcNow.ToString("yyyyMMddHHmmss")),new XElement(n+"evento",new XAttribute("versao","1.00"),new XElement(n+"infEvento",new XAttribute("Id",id),new XElement(n+"cOrgao","91"),new XElement(n+"tpAmb",env),new XElement(n+"CNPJ",Rules.Cnpj(cnpj)),new XElement(n+"chNFe",key),new XElement(n+"dhEvento",DateTimeOffset.Now.ToString("yyyy-MM-ddTHH:mm:sszzz")),new XElement(n+"tpEvento",eventType),new XElement(n+"nSeqEvento","1"),new XElement(n+"verEvento","1.00"),new XElement(n+"detEvento",new XAttribute("versao","1.00"),new XElement(n+"descEvento",eventType=="210200"?"Confirmacao da Operacao":"Ciencia da Operacao"))))));
    var xml=new XmlDocument{PreserveWhitespace=true,XmlResolver=null};xml.LoadXml(payload.ToString(SaveOptions.DisableFormatting));
    using(var rsa=certificate.GetRSAPrivateKey()) {
     var signed=new SignedXml(xml){SigningKey=rsa};signed.SignedInfo.CanonicalizationMethod=SignedXml.XmlDsigC14NTransformUrl;signed.SignedInfo.SignatureMethod=SignedXml.XmlDsigRSASHA1Url;
@@ -209,6 +217,9 @@ namespace XmlA1 {
   }
   public byte[] Science(string cnpj,int env,string key,CancellationToken token) {
    byte[] body=ScienceEnvelope(ScienceDocument(cnpj,env,key,cert));if(ScienceRequest!=null)ScienceRequest(body);return Post(env==1?"https://www.nfe.fazenda.gov.br/NFeRecepcaoEvento4/NFeRecepcaoEvento4.asmx":"https://hom1.nfe.fazenda.gov.br/NFeRecepcaoEvento4/NFeRecepcaoEvento4.asmx","http://www.portalfiscal.inf.br/nfe/wsdl/NFeRecepcaoEvento4/nfeRecepcaoEventoNF",body,token);
+  }
+  public byte[] Confirm(string cnpj,int env,string key,CancellationToken token) {
+   byte[] body=ScienceEnvelope(ConfirmationDocument(cnpj,env,key,cert));if(ConfirmationRequest!=null)ConfirmationRequest(body);return Post(env==1?"https://www.nfe.fazenda.gov.br/NFeRecepcaoEvento4/NFeRecepcaoEvento4.asmx":"https://hom1.nfe.fazenda.gov.br/NFeRecepcaoEvento4/NFeRecepcaoEvento4.asmx","http://www.portalfiscal.inf.br/nfe/wsdl/NFeRecepcaoEvento4/nfeRecepcaoEventoNF",body,token);
   }
   byte[] Post(string url,string action,byte[] body,CancellationToken token) {
    token.ThrowIfCancellationRequested();ServicePointManager.SecurityProtocol=SecurityProtocolType.Tls12;ServicePointManager.CheckCertificateRevocationList=true;

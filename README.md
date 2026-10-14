@@ -1,7 +1,7 @@
 # Download NF-e SEFAZ — XML A1
 
 Aplicativo Windows independente para consultar NF-e modelo 55 com certificado e-CNPJ
-A1 e organizar uma biblioteca local de XMLs. Versão **1.3.0**, C# / .NET Framework 4.8.
+A1 e organizar uma biblioteca local de XMLs. Versão **1.4.0**, C# / .NET Framework 4.8.
 
 ## Programa compilado
 
@@ -46,15 +46,38 @@ arquivos de estado para reiniciar NSUs indiscriminadamente.
 3. Clique em **Validar e adicionar**. Confira válidas, inválidas e repetidas.
 4. Clique em **Baixar / continuar XMLs**.
 
-As opções de download automático e ciência quando necessária aparecem marcadas;
-o envio de ciência exige autorização na interface. A autorização da fila se limita
-às suas chaves pendentes e é separada da ciência global da tela principal.
+A opção **Reconheço as operações das chaves digitadas/coladas; confirmar (210200)
+se faltar XML** aparece marcada. Ao iniciar pela primeira vez, a interface apresenta
+a autorização específica de Confirmação da Operação. Essa declaração é limitada às
+chaves digitadas ou coladas e adicionadas por você, para o CNPJ e ambiente selecionados.
 
-O programa consulta primeiro e salva o XML completo sem enviar evento. Quando
-recebe só um resumo elegível e a opção está autorizada, pode enviar **Ciência da
-Operação (210210)** e aguardar a disponibilização. Resumo, evento e ausência de
-documento mantêm a chave pendente: a espera inicial é de uma hora e passa a seis
-horas após 24 verificações. Consultas novas têm prioridade sobre reconsultas.
+O programa tenta baixar primeiro. Se recebe o XML completo, salva sem enviar evento.
+Se a consulta devolve apenas resumo elegível, pode enviar **Confirmação da Operação
+(210200)** para as chaves reconhecidas e autorizadas. Não é necessário enviar ciência
+antes nem aguardar dez dias. A SEFAZ valida o prazo próprio da manifestação conclusiva,
+que é de até 90 dias da autorização, e os demais requisitos.
+
+Após aceite ou duplicidade conferida, a primeira consulta do XML é agendada para
+cinco minutos depois, respeitando as pausas e o limite compartilhado de consultas.
+Se o XML ainda não estiver disponível, a chave continua pendente. A espera passa
+a uma hora e, após 24 verificações, a seis horas. Consultas novas têm prioridade.
+
+A confirmação tem histórico próprio e não reaproveita uma rejeição 596 da ciência
+como sucesso. Notas canceladas, denegadas ou com manifestação incompatível não são
+confirmadas automaticamente. O programa nunca transmite uma sequência de retificação
+para alterar manifestação conclusiva anterior. Resultados incertos pausam novas
+confirmações e não autorizam reenvio automático.
+
+Resumos encontrados pela busca sequencial ou adicionados por tarefas internas
+**não são reconhecidos automaticamente como operações realizadas**. A confirmação
+da lista exige a marca de origem manual e autorização própria. A ciência global
+continua disponível separadamente. Se preferir ciência em vez de confirmação,
+desmarque a confirmação e escolha a opção de ciência da fila.
+
+**Ao atualizar de uma versão anterior, cole novamente as chaves e clique em
+Validar e adicionar.** Isso identifica quais chaves da fila antiga foram fornecidas
+por você. Elas não serão duplicadas. Depois clique em Baixar / continuar XMLs e
+autorize a nova opção. A atualização sozinha não ativa confirmação em filas antigas.
 
 A fila permanece salva ao fechar. Para retomar, abra o aplicativo e carregue o A1,
 mantendo empresa e ambiente correspondentes. Não há serviço em segundo plano.
@@ -85,10 +108,11 @@ não reconstrói notas a partir de resumos nem muda o destinatário para classif
 como recebidas. A disponibilização depende da SEFAZ, da permissão, do histórico e
 da manifestação aplicável. Passar de dez dias não libera automaticamente o XML.
 
-O programa **não envia Confirmação da Operação (210200)** para substituir ciência
-rejeitada. Ciência registra conhecimento; a manifestação conclusiva aplicável
-deve ser decidida pelo usuário. Tentativas incertas ficam registradas e não são
-repetidas automaticamente. Pedidos e retornos ficam em Manifestacoes na biblioteca.
+A Confirmação da Operação declara que a operação foi realizada. A existência de um
+resumo não equivale a essa declaração. Somente as chaves fornecidas pelo usuário e
+autorizadas na fila usam esse fluxo. Pedidos, retornos e protocolos são preservados,
+e a coluna **Confirmação**, também exportada para XLSX, separa o resultado do evento
+do código da consulta de documentos.
 
 Há limite local de **20 consultas por chave por hora**. Distribuição sequencial
 respeita as pausas de 137, maxNSU e 656. Falhas ambíguas de rede também suspendem
@@ -109,6 +133,7 @@ o certificado no repositório pessoal; ele é liberado ao descartar a sessão no
 A preferência pode lembrar o caminho do arquivo.
 
 Preferências, NSU, fila e histórico de ciência ficam em %LOCALAPPDATA%\XML-A1.
+O histórico da confirmação fica em %LOCALAPPDATA%\\XML-A1\\confirmacoes.
 XMLs e retornos ficam na pasta escolhida pelo usuário. Esses arquivos podem conter
 dados pessoais e fiscais e devem permanecer fora do Git.
 
@@ -136,8 +161,9 @@ O build usa o compilador do .NET Framework em
 Se o Windows impedir gravação na pasta do repositório, escolha outra saída com
 -Output; não é necessário alterar as proteções do sistema.
 
-São **165 verificações offline**, incluindo XML, NSU, fila, limites, retomada,
-ciência, rejeições, datas, colagem, XLSX, assinatura e mTLS com localhost.
+São **221 verificações offline**, incluindo XML, NSU, fila, limites, retomada,
+ciência, confirmação limitada às chaves manuais, rejeições, datas, colagem, XLSX,
+assinatura dos dois eventos e mTLS com localhost.
 test.ps1 cria um certificado sintético temporário e o remove no fim.
 Os testes não consultam a SEFAZ nem enviam eventos fiscais reais.
 O relatório fica em %USERPROFILE%\BuscaNFe-A1\testes.txt, fora do repositório.
@@ -151,6 +177,8 @@ O escopo é **NF-e modelo 55**. Não inclui CT-e, NFC-e ou NFS-e.
 O repositório contém os fontes, a documentação e o binário desta aplicação.
 
 ## Referências
+
+- [NT 2020.001 v1.60 — manifestações do destinatário](https://www.nfe.fazenda.gov.br/Portal/exibirArquivo.aspx?AspxAutoDetectCookieSupport=1&conteudo=%2BWTd7iuD21s%3D).
 
 - [NT 2014.002 v1.40 — distribuição de DF-e](https://www.nfe.fazenda.gov.br/portal/exibirArquivo.aspx?conteudo=uWO2d%2FgTuWg%3D).
 - [Serviços web oficiais da NF-e](https://www.nfe.fazenda.gov.br/portal/WebServices.aspx).

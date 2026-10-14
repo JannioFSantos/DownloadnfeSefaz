@@ -1,4 +1,4 @@
-# Arquitetura e manutenção — XML A1 1.3.0
+# Arquitetura e manutenção — XML A1 1.4.0
 
 Aplicação Windows Forms em C#, para .NET Framework 4.8. O projeto usa o compilador
 do Framework diretamente, sem NuGet ou bibliotecas externas.
@@ -12,6 +12,8 @@ O executável inclui a interface, a lógica de consulta e os testes offline.
 | `src/MainForm.cs` | Interface principal, carregamento do A1, biblioteca, filtros, importação e coordenação das tarefas. |
 | `src/Core.cs` | Validações, certificado, XML, armazenamento, cursor NSU, comunicação SOAP/TLS e assinatura dos eventos. |
 | `src/Batch.cs` | Colagem de chaves, datas, persistência da fila, limites de consultas, prioridades e reconsultas. |
+| `src/AutoConfirmation.cs` | Confirmação 210200 limitada às chaves manuais autorizadas, histórico e agendamento de XML. |
+| `src/ConfirmationTests.cs` | Escopo, autorização, confirmação, recuperação, produtos e assinatura do evento. |
 | `src/AutoScience.cs` | Autorização, elegibilidade, histórico durável de ciência e agendamento posterior do XML. |
 | `src/KeyBatchForm.cs` | Tela de colagem, autorização da ciência na fila, início, pausa, reconsulta e resultados. |
 | `src/QueueSpreadsheet.cs` | Exportação XLSX sem dependência do Excel; chaves gravadas como texto. |
@@ -67,7 +69,7 @@ contabilizam chamadas feitas por outros programas na mesma empresa.
 
 ## Ciência da Operação
 
-O único evento fiscal implementado para envio é `210210`. A assinatura é produzida
+O evento de ciência é `210210`. A assinatura é produzida
 em `SefazClient.ScienceDocument`; o envelope preserva a assinatura após a inclusão
 no SOAP. O certificado incluído na assinatura é público, sem a chave privada.
 
@@ -81,9 +83,39 @@ evento já registrado. Retornos 135, 136 e 573 são conferidos contra chave, amb
 tipo de evento e sequência; 136 permanece identificado como sem vínculo.
 
 Rejeição 596 não é tratada como ciência aceita. No modo de download, a consulta
-do XML continua sem reenviar o evento. Não existe fallback para o evento 210200
-(Confirmação da Operação). Resultado incerto ou erro de certificado pausa novos
-eventos; o histórico é preservado para revisão.
+do XML continua sem reenviar o evento. Esse fluxo não envia confirmação por conta
+própria. Resultado incerto ou erro de certificado pausa novos eventos; o histórico
+é preservado para revisão.
+
+## Confirmação das chaves fornecidas pelo usuário
+
+O evento 210200 tem transporte e histórico separados da ciência. A autorização é
+persistida em KeyQueue.ConfirmForDownload / ConfirmationConsent e exige, por chave,
+UserSupplied=true. Somente AddUserKeys, chamado na colagem da interface, marca essa
+origem; Add, usado por tarefas internas, não a marca. Filas antigas recebem falso
+por padrão até que o usuário cole novamente suas chaves e autorize a confirmação.
+
+AutoConfirmationRunner exige uma consulta anterior da chave com código 138,
+resumo autorizado, ausência de XML completo e de eventos incompatíveis. A ciência
+não é pré-requisito. A ciência da fila é excluída nesse modo, e a ciência global
+reserva essas chaves para evitar dois eventos concorrentes.
+
+O histórico registra a tentativa incerta antes da rede, salva o retorno antes de
+atualizar a fila e não reenvia registros conhecidos após falha ou reinício. A
+resposta é conferida contra chave, empresa, ambiente, tipo 210200 e sequência 1.
+135, 136 e 573 têm estados distintos; um registro sem vínculo não garante XML liberado.
+Nenhuma sequência 2 é enviada automaticamente para retificar manifestação anterior.
+
+Após registro, a chave aguarda cinco minutos antes da primeira reconsulta, sujeita
+ao limite compartilhado. São permitidas até 20 novas confirmações por janela local
+de cinco minutos, contando tentativas persistidas. Erro de rede ou de certificado
+pausa confirmações e preserva a fila de download. A rejeição 596 do novo evento
+continua rejeição e não apaga nem altera o histórico anterior de ciência.
+
+HasPendingWork impede que a verificação do timer monopolize as demais tarefas
+quando todas as confirmações já estão tratadas ou não há resumo elegível. Os testes
+também verificam download anterior à confirmação, preservação dos produtos do XML,
+duplicidade, origem manual, separação dos códigos na planilha e recuperação de falhas.
 
 ## Arquivos em execução
 
@@ -91,6 +123,7 @@ eventos; o histórico é preservado para revisão.
 - Preferências: `%LOCALAPPDATA%\XML-A1\preferencias.xml`.
 - Cursor e pausas: `%LOCALAPPDATA%\XML-A1\estado`.
 - Fila: `%LOCALAPPDATA%\XML-A1\filas`.
+- Histórico de confirmações: `%LOCALAPPDATA%\\XML-A1\\confirmacoes`.
 - Autorização e histórico da ciência: `%LOCALAPPDATA%\XML-A1\ciencia`.
 - Pedidos e respostas de eventos: `Manifestacoes` na biblioteca da empresa.
 
@@ -103,7 +136,7 @@ Não compartilhe logs ou pastas de execução como parte de uma atualização do
 `build.ps1` compila `src/*.cs` e copia a configuração do Framework e o README.
 O parâmetro `-Output` permite escolher uma pasta fora do repositório.
 `test.ps1`, executado com PowerShell 7, recompila em pasta temporária e executa
-165 verificações offline, incluindo assinatura e autenticação mútua com localhost.
+221 verificações offline, incluindo assinatura e autenticação mútua com localhost.
 
 `dist/XmlA1.exe` é uma compilação deste código. `dist/SHA256SUMS.txt` permite
 conferir sua integridade; o arquivo não é uma assinatura digital do distribuidor.
