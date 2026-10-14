@@ -1,0 +1,9 @@
+* text=auto
+*.cs text eol=crlf
+*.ps1 text eol=crlf
+*.md text eol=lf
+*.config text eol=crlf
+*.manifest text eol=crlf
+*.exe binary
+dist/XmlA1.exe.config -text
+dist/SHA256SUMS.txt text eol=lf

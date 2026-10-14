@@ -1,0 +1,35 @@
+# Somente os arquivos de publicação abaixo podem entrar no Git.
+*
+!/.gitignore
+!/.gitattributes
+!/README.md
+!/build.ps1
+!/test.ps1
+!/app.manifest
+!/XmlA1.exe.config
+!/src/
+!/src/*.cs
+!/docs/
+!/docs/ARQUITETURA.md
+!/dist/
+!/dist/XmlA1.exe
+!/dist/XmlA1.exe.config
+!/dist/SHA256SUMS.txt
+
+# Defesa adicional contra credenciais e dados de execução.
+**/*.[pP][fF][xX]
+**/*.[pP]12
+**/*.[pP][eE][mM]
+**/*.[kK][eE][yY]
+**/*.[pP]8
+**/*.[pP][vV][kK]
+**/*.pdb
+**/.env*
+**/preferencias.xml
+**/Documentos/
+**/Resumos/
+**/Recebidas/
+**/Emitidas/
+**/Manifestacoes/
+**/original/
+**/analise/
